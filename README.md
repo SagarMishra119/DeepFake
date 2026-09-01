@@ -5,99 +5,118 @@
 [![Keras](https://img.shields.io/badge/Keras-Deep%20Learning-red.svg)](https://keras.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An end-to-end Computer Vision and Deep Learning pipeline designed to detect facial manipulation and classify images as **Real** or **Fake (DeepFake)** using **EfficientNetB0** transfer learning and progressive fine-tuning.
+An end-to-end Computer Vision and Deep Learning system engineered to detect facial manipulation and classify images as **Real** or **Fake (DeepFake)** using an **EfficientNetB0** transfer learning and progressive fine-tuning pipeline.
 
 ---
 
 ## 📌 Table of Contents
 - [Project Overview](#-project-overview)
-- [Architecture & Pipeline](#-architecture--pipeline)
-- [Dataset & Preprocessing](#-dataset--preprocessing)
+- [Model Architecture & Pipeline](#-model-architecture--pipeline)
+- [Dataset & Processing](#-dataset--processing)
 - [Training Strategy](#-training-strategy)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
+- [Repository Structure](#-repository-structure)
+- [Quickstart Guide](#-quickstart-guide)
 - [Evaluation & Metrics](#-evaluation--metrics)
-- [Inference & GUI](#-inference--gui)
+- [Desktop Inference](#-desktop-inference)
 - [Configuration](#-configuration)
-- [Google Colab Support](#-google-colab-support)
 - [License](#-license)
 
 ---
 
 ## 🔍 Project Overview
 
-The proliferation of hyper-realistic generative AI models and face-swapping algorithms poses severe security, misinformation, and identity verification challenges. This project implements a robust deep learning framework to detect subtle visual artifacts and synthetic manipulation patterns across facial images.
+With the rapid advancement of generative adversarial networks (GANs) and diffusion-based face synthesis, identifying manipulated media has become crucial for digital forensics and identity verification.
 
-### Key Highlights
-- **Backbone:** Pre-trained `EfficientNetB0` on ImageNet as a scalable, high-efficiency feature extractor.
-- **Two-Phase Transfer Learning:** Combines frozen feature extraction with deep unfreezing of higher-order feature layers.
-- **In-Graph Augmentation:** GPU-accelerated data augmentations directly embedded into the model architecture.
-- **Production-Ready Inference:** Built-in desktop GUI for point-and-click image testing with confidence scoring.
-
----
-
-## 🧠 Architecture & Pipeline
-
-The model utilizes an integrated preprocessing and classification pipeline:
-
-```
-[ Input Image: 224x224x3 ]
-           │
-           ▼
-[ Data Augmentation Layer ]  ──> (RandomFlip, RandomRotation, RandomZoom, RandomContrast)
-           │
-           ▼
-[ EfficientNet Preprocessing ] ──> (Normalization & Scaling)
-           │
-           ▼
-[ EfficientNetB0 Backbone ]   ──> (Pre-trained on ImageNet)
-           │
-           ▼
-[ GlobalAveragePooling2D ]   ──> (Feature Vector Extraction)
-           │
-           ▼
-[ Dropout Layer (0.2) ]       ──> (Regularization / Anti-Overfitting)
-           │
-           ▼
-[ Dense Layer (1 Unit, Sigmoid) ] ──> Output Probability: [0.0 = Fake, 1.0 = Real]
-```
+This repository provides a modular, production-ready framework to detect facial tampering:
+- **Transfer Learning Backbone:** Utilizes `EfficientNetB0` pre-trained on ImageNet for high-accuracy feature representation with low parameter overhead.
+- **Two-Phase Training:** Implements frozen feature extraction followed by deeper fine-tuning from higher convolutional blocks.
+- **Embedded Augmentations:** GPU-accelerated spatial and color transformations directly inside the model graph.
+- **Interactive Inference:** Desktop GUI utility with instant confidence diagnostics.
 
 ---
 
-## 📊 Dataset & Preprocessing
+## 🧠 Model Architecture & Pipeline
 
-The system processes balanced image subsets derived from the **Real vs Fake** face dataset:
+The neural pipeline integrates data augmentation, normalization, feature extraction, and binary classification:
 
-- **Stratified Split Targets (`sampling.py`):**
-  - **Train:** 2,800 images/class (5,600 total)
-  - **Validation:** 600 images/class (1,200 total)
-  - **Test:** 600 images/class (1,200 total)
-  - **Total Dataset Size:** 8,000 balanced images
-- **Data Augmentations:**
+```text
+               ┌───────────────────────────────┐
+               │    Input Image (224x224x3)    │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │    Data Augmentation Layer    │
+               │ (Flip, Rotation, Zoom, Cont.) │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │   EfficientNet Preprocessing  │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │     EfficientNetB0 Backbone   │
+               │   (ImageNet Pretrained Base)  │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │    GlobalAveragePooling2D     │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │       Dropout Layer (0.2)     │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │      Dense Output Layer       │
+               │     (1 Unit, Sigmoid Act.)    │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+            Probability: [0.0 = Fake | 1.0 = Real]
+```
+
+---
+
+## 📊 Dataset & Processing
+
+The project includes pre-processed, balanced subsets organized under `processed/`:
+
+- **Split Breakdown:**
+  - **Train:** 2,800 Real / 2,800 Fake (5,600 images)
+  - **Validation:** 600 Real / 600 Fake (1,200 images)
+  - **Test:** 600 Real / 600 Fake (1,200 images)
+  - **Total:** 8,000 balanced images
+- **Augmentation Pipeline:**
   - Random Horizontal Flip
-  - Random Rotation (`±10%`)
-  - Random Zoom (`±10%`)
-  - Random Contrast Adjustment (`±10%`)
-- **Optimization:** Utilizes `tf.data` with `AUTOTUNE`, memory caching, and prefetching for optimal GPU utilization.
+  - Random Rotation (`factor=0.1`)
+  - Random Zoom (`factor=0.1`)
+  - Random Contrast Adjustment (`factor=0.1`)
+- **Performance:** Streamed via `tf.data.Dataset` pipelines with `AUTOTUNE`, memory caching, and background prefetching.
 
 ---
 
 ## 🏋️ Training Strategy
 
-A **Two-Phase Progressive Training** approach is used to achieve high validation accuracy while preventing catastrophic forgetting:
+To balance convergence speed with feature retention, a two-phase schedule is employed:
 
-| Parameter | Phase 1 (Feature Extraction) | Phase 2 (Fine-Tuning) |
+| Parameter | Phase 1: Feature Extraction | Phase 2: Fine-Tuning |
 | :--- | :--- | :--- |
-| **Backbone State** | Fully Frozen (`trainable=False`) | Unfrozen from Layer 100 onwards |
+| **Backbone State** | Frozen (`trainable=False`) | Unfrozen from Layer 100 onwards |
 | **Optimizer** | Adam | Adam |
-| **Learning Rate** | `1e-3` (`0.001`) | `1e-5` (`0.00001`) |
-| **Epochs** | Up to 10 | Up to 30 |
-| **Callbacks** | `EarlyStopping` (patience=3), `ModelCheckpoint` | `EarlyStopping` (patience=3), `ModelCheckpoint` |
-| **Primary Metric** | Validation Loss / Accuracy | Validation Loss / Accuracy |
+| **Learning Rate** | `0.001` (`1e-3`) | `0.00001` (`1e-5`) |
+| **Max Epochs** | 10 | 30 |
+| **Callbacks** | `ModelCheckpoint`, `EarlyStopping` (patience=3) | `ModelCheckpoint`, `EarlyStopping` (patience=3) |
+| **Monitored Metric** | `val_loss` / `val_accuracy` | `val_loss` / `val_accuracy` |
 
 ---
 
-## 📁 Project Structure
+## 📁 Repository Structure
 
 ```text
 DeepFake/
@@ -106,34 +125,39 @@ DeepFake/
 │   └── inference.py              # Desktop UI with file picker & prediction engine
 ├── evaluation/
 │   ├── __init__.py
-│   └── evaluate.py               # Computes accuracy, precision, recall, F1 & confusion matrix
+│   ├── confusion_matrix.png      # Generated test confusion matrix heatmap
+│   └── evaluate.py               # Evaluates metrics: Accuracy, Precision, Recall, F1
 ├── models/
 │   ├── __init__.py
-│   └── efficientnet_model.py     # Model architecture & build definition
+│   └── efficientnet_model.py     # EfficientNetB0 architecture and compilation
 ├── preprocessing/
 │   ├── __init__.py
-│   ├── augmentation.py           # Keras augmentation layers
+│   ├── augmentation.py           # Keras augmentation layer definitions
 │   ├── data_load.py              # tf.data loading, batching, and caching pipeline
-│   └── vil_augmentation.py       # Augmentation visualization script
+│   └── vil_augmentation.py       # Visualizer script for augmented samples
+├── processed/                    # Balanced dataset splits (Train, Valid, Test)
+│   ├── test/
+│   ├── train/
+│   └── valid/
 ├── training/
 │   ├── __init__.py
-│   └── train.py                  # Two-phase training script with history plotting
+│   └── train.py                  # Two-phase training script with curve plotting
 ├── utils/
 │   ├── __init__.py
-│   ├── config.py                 # Central configurations, hyperparams & directory paths
-│   └── visualization.py          # Loss and accuracy curve generator
-├── collabb/                      # Mirrored structure optimized for Google Colab
-├── sampling.py                   # Automated dataset splitter and sampling script
-└── requirements.txt              # Core project dependencies
+│   ├── config.py                 # Central configurations & portable relative paths
+│   └── visualization.py          # Training curve visualization utilities
+├── sampling.py                   # Automated dataset subset extraction script
+├── requirements.txt              # Python project dependencies
+└── README.md                     # Project documentation
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quickstart Guide
 
 ### 1. Installation
 
-Clone the repository and install required packages:
+Clone the repository and install dependencies:
 
 ```bash
 git clone https://github.com/SagarMishra119/DeepFake.git
@@ -141,9 +165,9 @@ cd DeepFake
 pip install -r requirements.txt
 ```
 
-### 2. Dataset Sampling
+### 2. Dataset Sampling (Optional)
 
-Extract a balanced subset from your raw dataset folder into `processed/`:
+If generating a fresh split from raw dataset archives:
 
 ```bash
 python sampling.py
@@ -151,78 +175,62 @@ python sampling.py
 
 ### 3. Model Training
 
-Run the two-phase training pipeline:
+Run the two-phase training script:
 
 ```bash
 python -m training.train
 ```
 
-Outputs will be saved automatically:
-- `saved_models/best_model.keras`
-- `saved_models/final_model.keras`
-- `saved_models/training_curves.png`
+Trained checkpoints and loss curves are saved under `saved_models/`.
 
 ---
 
 ## 📈 Evaluation & Metrics
 
-Evaluate the best model checkpoint on the independent test set:
+Evaluate the trained checkpoint against the independent test set:
 
 ```bash
 python -m evaluation.evaluate
 ```
 
 This generates:
-- **Metrics Report:** Accuracy, Precision, Recall, and F1-Score.
+- **Test Metrics:** Accuracy, Precision, Recall, and F1-Score.
 - **Confusion Matrix:** Saved to `evaluation/confusion_matrix.png`.
-- **Classification Report:** Detailed per-class precision and recall breakdown.
+- **Classification Report:** Detailed per-class precision and recall summary.
 
 ---
 
-## 🖥️ Inference & GUI
+## 🖥️ Desktop Inference
 
-Test individual face images using the built-in Tkinter desktop interface:
+Test any facial image locally using the interactive file dialog:
 
 ```bash
 python -m app.inference
 ```
 
-- Opens an interactive file selection dialog.
-- Preprocesses and resizes the image to `(224, 224, 3)`.
-- Outputs the classification decision (`real` / `fake`), confidence percentage, and raw sigmoid score.
+- Prompts an image selection dialog (`.jpg`, `.jpeg`, `.png`).
+- Returns classification label (`real` / `fake`), confidence percentage, and raw sigmoid logit.
 
 ---
 
 ## ⚙️ Configuration
 
-All hyperparameters and paths are centralized in [`utils/config.py`](utils/config.py):
+Hyperparameters, image dimensions, and training settings are configured in [`utils/config.py`](utils/config.py):
 
 ```python
-# Image & Batch Settings
+# Image and Batching
 Image_Size = (224, 224)
 Batch_Size = 64
 
-# Phase 1 Hyperparameters
+# Phase 1: Feature Extraction
 Phase1_Epochs = 10
 Phase1_LR = 0.001
 
-# Phase 2 Hyperparameters
+# Phase 2: Fine-Tuning
 Phase2_Epochs = 30
 Phase2_LR = 0.00001
 FINE_TUNE_AT_LAYER = 100
 ```
-
----
-
-## ☁️ Google Colab Support
-
-To train on Google Colab with GPU acceleration:
-1. Upload the `collabb/` directory to Google Drive.
-2. In `collabb/utils/config.py`, set:
-   ```python
-   Collab = True
-   ```
-3. Mount Google Drive and run `collabb/training/train.py`.
 
 ---
 
